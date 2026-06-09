@@ -23,17 +23,17 @@ const handleLogout = () => {
                 POS App
               </span>
             </div>
-            <nav class="ml-8 flex space-x-4 items-center">
+            <nav class="ml-4 sm:ml-8 flex space-x-1 sm:space-x-4 items-center">
               <RouterLink 
                 to="/" 
-                class="px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-indigo-600 hover:bg-indigo-50/50 transition-all"
+                class="px-2.5 sm:px-3 py-2 rounded-md text-xs sm:text-sm font-medium text-gray-700 hover:text-indigo-600 hover:bg-indigo-50/50 transition-all"
                 active-class="bg-indigo-50 text-indigo-600 font-semibold"
               >
                 หน้าแรก
               </RouterLink>
               <RouterLink 
                 to="/about" 
-                class="px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-indigo-600 hover:bg-indigo-50/50 transition-all"
+                class="px-2.5 sm:px-3 py-2 rounded-md text-xs sm:text-sm font-medium text-gray-700 hover:text-indigo-600 hover:bg-indigo-50/50 transition-all"
                 active-class="bg-indigo-50 text-indigo-600 font-semibold"
               >
                 เกี่ยวกับเรา
@@ -42,14 +42,14 @@ const handleLogout = () => {
           </div>
 
           <!-- User Info and Logout -->
-          <div class="flex items-center gap-4">
-            <div class="text-right hidden sm:block">
+          <div class="flex items-center gap-2 sm:gap-4">
+            <div class="text-right hidden md:block">
               <p class="text-sm font-semibold text-gray-800">{{ auth.user?.name }}</p>
               <p class="text-xs text-indigo-600 font-medium">{{ auth.user?.role }}</p>
             </div>
             <button 
               @click="handleLogout"
-              class="inline-flex items-center justify-center px-4 py-2 border border-gray-200 rounded-xl text-sm font-semibold text-gray-700 bg-white hover:bg-red-50 hover:text-red-600 hover:border-red-150 transition-all active:scale-95"
+              class="inline-flex items-center justify-center px-3 sm:px-4 py-2 border border-gray-200 rounded-xl text-xs sm:text-sm font-semibold text-gray-700 bg-white hover:bg-red-50 hover:text-red-600 hover:border-red-150 transition-all active:scale-95"
             >
               ออกจากระบบ
             </button>

@@ -17,6 +17,13 @@ const categories = [
   { id: 'drink', name: 'เครื่องดื่ม' }
 ]
 
+// Mobile Tab State
+const activeTab = ref('menu') // 'menu' or 'cart'
+
+const cartQuantity = computed(() => {
+  return pos.cart.reduce((sum, item) => sum + item.quantity, 0)
+})
+
 // Filtered Menu Items
 const filteredMenu = computed(() => {
   if (activeCategory.value === 'all') return pos.menuItems
@@ -59,101 +66,144 @@ const completeOrder = () => {
 </script>
 
 <template>
-  <div class="h-[calc(100vh-4rem)] flex flex-col md:flex-row bg-slate-100 overflow-hidden">
-    <!-- Left Panel: Menu Items Grid -->
-    <div class="flex-grow flex flex-col p-4 md:p-6 overflow-hidden h-full">
-      <!-- Top Bar: Shop Header & Category Selector -->
-      <div class="mb-4 bg-white rounded-2xl p-4 shadow-sm border border-slate-200/60 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 class="text-xl font-bold text-slate-800">เครื่องสั่งอาหาร - ร้านข้าวราดแกง</h1>
-          <p class="text-xs text-slate-500">แคชเชียร์: {{ auth.user?.name || 'พนักงาน' }} ({{ auth.user?.role || 'แคชเชียร์' }})</p>
-        </div>
-        
-        <!-- Serve Option Switcher -->
-        <div class="flex bg-slate-100 p-1 rounded-xl border border-slate-200">
-          <button 
-            @click="selectedOption = 'normal'"
-            :class="[
-              'px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all',
-              selectedOption === 'normal' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-600 hover:text-slate-800'
-            ]"
-          >
-            กับข้าวปกติ
-          </button>
-          <button 
-            @click="selectedOption = 'rad-khao-1'"
-            :class="[
-              'px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all',
-              selectedOption === 'rad-khao-1' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-600 hover:text-slate-800'
-            ]"
-          >
-            ราดข้าว 1 อย่าง
-          </button>
-          <button 
-            @click="selectedOption = 'rad-khao-2'"
-            :class="[
-              'px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all',
-              selectedOption === 'rad-khao-2' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-600 hover:text-slate-800'
-            ]"
-          >
-            ราดข้าว 2 อย่าง
-          </button>
-        </div>
-      </div>
-
-      <!-- Categories Filter Tabs -->
-      <div class="flex gap-2 overflow-x-auto pb-3 scrollbar-hide">
-        <button 
-          v-for="cat in categories" 
-          :key="cat.id"
-          @click="activeCategory = cat.id"
-          :class="[
-            'px-4 py-2 rounded-xl text-sm font-semibold whitespace-nowrap transition-all border',
-            activeCategory === cat.id 
-              ? 'bg-indigo-600 text-white border-indigo-600 shadow-md shadow-indigo-100' 
-              : 'bg-white text-slate-600 border-slate-200/80 hover:bg-slate-50'
-          ]"
-        >
-          {{ cat.name }}
-        </button>
-      </div>
-
-      <!-- Menu Grid -->
-      <div class="flex-grow overflow-y-auto mt-2 pr-1">
-        <div class="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-4">
-          <button 
-            v-for="item in filteredMenu" 
-            :key="item.id"
-            @click="pos.addToCart(item, selectedOption)"
-            class="group bg-white rounded-2xl p-4 text-left border border-slate-200/60 shadow-sm hover:shadow-md hover:border-indigo-200 transition-all flex flex-col justify-between h-36 relative overflow-hidden active:scale-95"
-          >
-            <!-- Decorative colored corner -->
-            <div :class="['absolute top-0 right-0 w-8 h-8 rounded-bl-full bg-gradient-to-tr opacity-20', item.color]"></div>
-            
-            <div class="z-10">
-              <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                {{ categories.find(c => c.id === item.category)?.name }}
-              </span>
-              <h3 class="font-bold text-slate-800 mt-1 line-clamp-2 text-sm sm:text-base leading-tight group-hover:text-indigo-600 transition-colors">
-                {{ item.name }}
-              </h3>
-            </div>
-            
-            <div class="flex justify-between items-baseline z-10 mt-auto">
-              <span class="text-lg font-extrabold text-slate-900">
-                ฿{{ item.price }}
-              </span>
-              <span class="text-xs text-indigo-600 font-bold opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-0.5">
-                เลือก +
-              </span>
-            </div>
-          </button>
-        </div>
-      </div>
+  <div class="h-[calc(100vh-4rem)] flex flex-col bg-slate-100 overflow-hidden">
+    <!-- Mobile Tab Switcher -->
+    <div class="md:hidden flex bg-white border-b border-slate-200 p-2 gap-2 shrink-0">
+      <button 
+        @click="activeTab = 'menu'" 
+        :class="[
+          'flex-1 py-2 text-center text-sm font-bold rounded-xl transition-all',
+          activeTab === 'menu' ? 'bg-indigo-50 text-indigo-600' : 'text-slate-600'
+        ]"
+      >
+        รายการอาหาร
+      </button>
+      <button 
+        @click="activeTab = 'cart'" 
+        :class="[
+          'flex-1 py-2 text-center text-sm font-bold rounded-xl transition-all relative',
+          activeTab === 'cart' ? 'bg-indigo-50 text-indigo-600' : 'text-slate-600'
+        ]"
+      >
+        ตะกร้าสินค้า
+        <span v-if="cartQuantity > 0" class="absolute top-1/2 -translate-y-1/2 right-4 bg-rose-500 text-white text-[10px] w-5 h-5 rounded-full flex items-center justify-center font-bold">
+          {{ cartQuantity }}
+        </span>
+      </button>
     </div>
 
-    <!-- Right Panel: Cart/Order Sidebar -->
-    <div class="w-full md:w-96 bg-white border-t md:border-t-0 md:border-l border-slate-200 shadow-xl flex flex-col h-full overflow-hidden shrink-0">
+    <!-- Main Workspace Container -->
+    <div class="flex-grow flex flex-col md:flex-row overflow-hidden relative">
+      <!-- Left Panel: Menu Items Grid -->
+      <div :class="['flex-grow flex flex-col p-4 md:p-6 overflow-hidden h-full relative pb-20 md:pb-6', activeTab === 'menu' ? 'flex' : 'hidden md:flex']">
+        <!-- Top Bar: Shop Header & Category Selector -->
+        <div class="mb-4 bg-white rounded-2xl p-4 shadow-sm border border-slate-200/60 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div>
+            <h1 class="text-xl font-bold text-slate-800">เครื่องสั่งอาหาร - ร้านข้าวราดแกง</h1>
+            <p class="text-xs text-slate-500">แคชเชียร์: {{ auth.user?.name || 'พนักงาน' }} ({{ auth.user?.role || 'แคชเชียร์' }})</p>
+          </div>
+          
+          <!-- Serve Option Switcher -->
+          <div class="flex bg-slate-100 p-1 rounded-xl border border-slate-200 w-full sm:w-auto justify-between sm:justify-start">
+            <button 
+              @click="selectedOption = 'normal'"
+              :class="[
+                'flex-1 sm:flex-initial px-3 py-1.5 rounded-lg text-xs font-bold transition-all text-center',
+                selectedOption === 'normal' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-600 hover:text-slate-800'
+              ]"
+            >
+              กับข้าวปกติ
+            </button>
+            <button 
+              @click="selectedOption = 'rad-khao-1'"
+              :class="[
+                'flex-1 sm:flex-initial px-3 py-1.5 rounded-lg text-xs font-bold transition-all text-center',
+                selectedOption === 'rad-khao-1' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-600 hover:text-slate-800'
+              ]"
+            >
+              ราดข้าว 1
+            </button>
+            <button 
+              @click="selectedOption = 'rad-khao-2'"
+              :class="[
+                'flex-1 sm:flex-initial px-3 py-1.5 rounded-lg text-xs font-bold transition-all text-center',
+                selectedOption === 'rad-khao-2' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-600 hover:text-slate-800'
+              ]"
+            >
+              ราดข้าว 2
+            </button>
+          </div>
+        </div>
+
+        <!-- Categories Filter Tabs -->
+        <div class="flex gap-2 overflow-x-auto pb-3 scrollbar-hide shrink-0">
+          <button 
+            v-for="cat in categories" 
+            :key="cat.id"
+            @click="activeCategory = cat.id"
+            :class="[
+              'px-4 py-2 rounded-xl text-sm font-semibold whitespace-nowrap transition-all border',
+              activeCategory === cat.id 
+                ? 'bg-indigo-600 text-white border-indigo-600 shadow-md shadow-indigo-100' 
+                : 'bg-white text-slate-600 border-slate-200/80 hover:bg-slate-50'
+            ]"
+          >
+            {{ cat.name }}
+          </button>
+        </div>
+
+        <!-- Menu Grid -->
+        <div class="flex-grow overflow-y-auto mt-2 pr-1">
+          <div class="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-4">
+            <button 
+              v-for="item in filteredMenu" 
+              :key="item.id"
+              @click="pos.addToCart(item, selectedOption)"
+              class="group bg-white rounded-2xl p-4 text-left border border-slate-200/60 shadow-sm hover:shadow-md hover:border-indigo-200 transition-all flex flex-col justify-between h-36 relative overflow-hidden active:scale-95"
+            >
+              <!-- Decorative colored corner -->
+              <div :class="['absolute top-0 right-0 w-8 h-8 rounded-bl-full bg-gradient-to-tr opacity-20', item.color]"></div>
+              
+              <div class="z-10">
+                <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                  {{ categories.find(c => c.id === item.category)?.name }}
+                </span>
+                <h3 class="font-bold text-slate-800 mt-1 line-clamp-2 text-sm sm:text-base leading-tight group-hover:text-indigo-600 transition-colors">
+                  {{ item.name }}
+                </h3>
+              </div>
+              
+              <div class="flex justify-between items-baseline z-10 mt-auto">
+                <span class="text-lg font-extrabold text-slate-900">
+                  ฿{{ item.price }}
+                </span>
+                <span class="text-xs text-indigo-600 font-bold opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-0.5">
+                  เลือก +
+                </span>
+              </div>
+            </button>
+          </div>
+        </div>
+
+        <!-- Floating bottom cart button for mobile -->
+        <div v-if="pos.cart.length > 0" class="md:hidden absolute bottom-4 left-4 right-4 z-30">
+          <button 
+            @click="activeTab = 'cart'" 
+            class="w-full bg-indigo-600 text-white py-3 px-5 rounded-xl shadow-xl font-bold flex justify-between items-center active:scale-95 transition-transform"
+          >
+            <span class="flex items-center gap-2">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+              </svg>
+              <span>ดูตะกร้า ({{ cartQuantity }} รายการ)</span>
+            </span>
+            <span class="text-lg font-extrabold">฿{{ pos.total }}</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Right Panel: Cart/Order Sidebar -->
+      <div :class="['w-full md:w-96 bg-white border-t md:border-t-0 md:border-l border-slate-200 shadow-xl flex flex-col h-full overflow-hidden shrink-0', activeTab === 'cart' ? 'flex' : 'hidden md:flex']">
       <!-- Order Title -->
       <div class="p-4 border-b border-slate-200 flex justify-between items-center bg-slate-50/50">
         <div class="flex items-center gap-2">
@@ -250,6 +300,7 @@ const completeOrder = () => {
           ชำระเงิน
         </button>
       </div>
+    </div>
     </div>
 
     <!-- Payment Modal -->
