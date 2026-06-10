@@ -25,6 +25,10 @@ export const usePosStore = defineStore('pos', () => {
 
   const cart = ref([])
   const discount = ref(0) // percentage or absolute (we'll use THB absolute discount)
+  const orderType = ref('dine-in')
+  const selectedTable = ref('')
+  const tables = ref(Array.from({ length: 12 }, (_, index) => index + 1))
+  const heldOrders = ref([])
 
   const subtotal = computed(() => {
     return cart.value.reduce((sum, item) => sum + (item.price * item.quantity), 0)
@@ -34,6 +38,13 @@ export const usePosStore = defineStore('pos', () => {
     const calculated = subtotal.value - discount.value
     return calculated < 0 ? 0 : calculated
   })
+
+  function resetOrder() {
+    cart.value = []
+    discount.value = 0
+    orderType.value = 'dine-in'
+    selectedTable.value = ''
+  }
 
   function addToCart(product, option = 'normal') {
     // Check if item already exists in cart with same option
@@ -83,15 +94,74 @@ export const usePosStore = defineStore('pos', () => {
     discount.value = 0
   }
 
+  function holdCurrentOrder() {
+    if (cart.value.length === 0 || orderType.value !== 'dine-in' || !selectedTable.value) return false
+
+    const order = {
+      id: `table-${selectedTable.value}`,
+      table: selectedTable.value,
+      cart: cart.value.map(item => ({ ...item })),
+      discount: discount.value,
+      subtotal: subtotal.value,
+      total: total.value,
+      itemCount: cart.value.reduce((sum, item) => sum + item.quantity, 0),
+      createdAt: new Date().toISOString()
+    }
+
+    const existingIndex = heldOrders.value.findIndex(item => item.table === selectedTable.value)
+    if (existingIndex > -1) {
+      heldOrders.value.splice(existingIndex, 1, order)
+    } else {
+      heldOrders.value.push(order)
+    }
+
+    resetOrder()
+    return true
+  }
+
+  function loadHeldOrder(tableNumber) {
+    const orderIndex = heldOrders.value.findIndex(item => item.table === tableNumber)
+    if (orderIndex === -1) return false
+
+    const order = heldOrders.value[orderIndex]
+    cart.value = order.cart.map(item => ({ ...item }))
+    discount.value = order.discount
+    orderType.value = 'dine-in'
+    selectedTable.value = order.table
+    heldOrders.value.splice(orderIndex, 1)
+    return true
+  }
+
+  function setOrderType(type) {
+    orderType.value = type
+    if (type === 'takeaway') {
+      selectedTable.value = ''
+    }
+  }
+
+  function setSelectedTable(tableNumber) {
+    selectedTable.value = tableNumber
+    orderType.value = 'dine-in'
+  }
+
   return {
     menuItems,
     cart,
     discount,
+    orderType,
+    selectedTable,
+    tables,
+    heldOrders,
     subtotal,
     total,
+    resetOrder,
     addToCart,
     removeFromCart,
     updateQuantity,
-    clearCart
+    clearCart,
+    holdCurrentOrder,
+    loadHeldOrder,
+    setOrderType,
+    setSelectedTable
   }
 })

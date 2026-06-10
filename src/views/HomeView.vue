@@ -35,6 +35,7 @@ const selectedOption = ref('normal') // normal (กับข้าว), rad-khao
 
 // Payment Modal State
 const isPaymentModalOpen = ref(false)
+const isTableModalOpen = ref(false)
 const amountPaid = ref('')
 const paymentMethod = ref('cash') // 'cash' or 'qr'
 const isPaidSuccess = ref(false)
@@ -46,9 +47,39 @@ const changeAmount = computed(() => {
 
 const openPayment = () => {
   if (pos.cart.length === 0) return
+  if (pos.orderType === 'dine-in' && !pos.selectedTable) {
+    isTableModalOpen.value = true
+    return
+  }
   amountPaid.value = ''
   isPaidSuccess.value = false
   isPaymentModalOpen.value = true
+}
+
+const openTableSelector = () => {
+  pos.setOrderType('dine-in')
+  isTableModalOpen.value = true
+}
+
+const selectTable = (table) => {
+  pos.setSelectedTable(table)
+  isTableModalOpen.value = false
+}
+
+const holdOrder = () => {
+  if (pos.orderType !== 'dine-in' || !pos.selectedTable) {
+    isTableModalOpen.value = true
+    return
+  }
+
+  if (pos.holdCurrentOrder()) {
+    activeTab.value = 'menu'
+  }
+}
+
+const loadHeldOrder = (table) => {
+  pos.loadHeldOrder(table)
+  activeTab.value = 'cart'
 }
 
 const processPayment = () => {
@@ -60,7 +91,7 @@ const processPayment = () => {
 }
 
 const completeOrder = () => {
-  pos.clearCart()
+  pos.resetOrder()
   isPaymentModalOpen.value = false
 }
 </script>
@@ -221,6 +252,69 @@ const completeOrder = () => {
         </button>
       </div>
 
+      <!-- Dining Type Selector -->
+      <div class="p-4 border-b border-slate-200 bg-white space-y-3">
+        <div class="grid grid-cols-2 gap-2">
+          <button
+            @click="openTableSelector"
+            :class="[
+              'py-2.5 px-3 rounded-xl border text-sm font-bold transition-all',
+              pos.orderType === 'dine-in'
+                ? 'bg-indigo-50 border-indigo-600 text-indigo-600 shadow-sm'
+                : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+            ]"
+          >
+            นั่งที่ร้าน
+          </button>
+          <button
+            @click="pos.setOrderType('takeaway')"
+            :class="[
+              'py-2.5 px-3 rounded-xl border text-sm font-bold transition-all',
+              pos.orderType === 'takeaway'
+                ? 'bg-emerald-50 border-emerald-600 text-emerald-600 shadow-sm'
+                : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+            ]"
+          >
+            กลับบ้าน
+          </button>
+        </div>
+
+        <div class="flex items-center justify-between rounded-xl bg-slate-50 border border-slate-200 px-3 py-2">
+          <span class="text-xs font-semibold text-slate-500">ประเภทออเดอร์</span>
+          <span class="text-sm font-extrabold text-slate-800">
+            {{ pos.orderType === 'takeaway' ? 'กลับบ้าน' : (pos.selectedTable ? `นั่งที่ร้าน - โต๊ะ ${pos.selectedTable}` : 'นั่งที่ร้าน - ยังไม่เลือกโต๊ะ') }}
+          </span>
+        </div>
+      </div>
+
+      <!-- Held Table Orders -->
+      <div v-if="pos.heldOrders.length > 0" class="p-4 border-b border-slate-200 bg-amber-50/60 space-y-2">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-bold text-amber-700 uppercase tracking-wider">บิลค้าง</span>
+          <span class="text-xs font-semibold text-amber-700">{{ pos.heldOrders.length }} โต๊ะ</span>
+        </div>
+
+        <div class="space-y-2 max-h-40 overflow-y-auto pr-1">
+          <button
+            v-for="order in pos.heldOrders"
+            :key="order.id"
+            @click="loadHeldOrder(order.table)"
+            class="w-full rounded-xl border border-amber-200 bg-white px-3 py-2 text-left hover:border-amber-400 hover:bg-amber-50 transition-all"
+          >
+            <div class="flex items-center justify-between gap-3">
+              <div>
+                <p class="text-sm font-extrabold text-slate-800">โต๊ะ {{ order.table }}</p>
+                <p class="text-xs text-slate-500">{{ order.itemCount }} รายการ</p>
+              </div>
+              <div class="text-right">
+                <p class="text-sm font-extrabold text-amber-700">฿{{ order.total }}</p>
+                <p class="text-[10px] font-bold text-slate-400">เรียกบิล</p>
+              </div>
+            </div>
+          </button>
+        </div>
+      </div>
+
       <!-- Cart Items List -->
       <div class="flex-grow overflow-y-auto p-4 space-y-3">
         <div 
@@ -291,7 +385,15 @@ const completeOrder = () => {
           <span class="text-indigo-600 text-xl">฿{{ pos.total }}</span>
         </div>
 
-        <!-- Checkout Trigger Button -->
+        <!-- Hold and Checkout Actions -->
+        <button 
+          @click="holdOrder"
+          :disabled="pos.cart.length === 0"
+          class="w-full mt-2 inline-flex justify-center items-center py-3 px-4 border border-amber-200 rounded-xl text-sm font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 disabled:opacity-50 disabled:cursor-not-allowed transition-all transform active:scale-98"
+        >
+          พักบิลโต๊ะนี้
+        </button>
+
         <button 
           @click="openPayment"
           :disabled="pos.cart.length === 0"
@@ -301,6 +403,49 @@ const completeOrder = () => {
         </button>
       </div>
     </div>
+    </div>
+
+    <!-- Table Selection Modal -->
+    <div v-if="isTableModalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+      <div class="bg-white rounded-2xl shadow-2xl border border-slate-100 w-full max-w-md overflow-hidden animate-fade-in">
+        <div class="p-4 border-b border-slate-200 flex justify-between items-center bg-slate-50">
+          <div>
+            <h3 class="font-bold text-slate-800 text-lg">เลือกโต๊ะนั่งทาน</h3>
+            <p class="text-xs text-slate-500 mt-0.5">แตะหมายเลขโต๊ะที่ลูกค้าต้องการนั่ง</p>
+          </div>
+          <button @click="isTableModalOpen = false" class="text-slate-400 hover:text-slate-600">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <div class="p-5 space-y-4">
+          <div class="grid grid-cols-3 sm:grid-cols-4 gap-3">
+            <button
+              v-for="table in pos.tables"
+              :key="table"
+              @click="selectTable(table)"
+              :class="[
+                'h-16 rounded-xl border text-base font-extrabold transition-all flex flex-col items-center justify-center',
+                pos.selectedTable === table
+                  ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg shadow-indigo-100'
+                  : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-indigo-50 hover:border-indigo-200 hover:text-indigo-600'
+              ]"
+            >
+              <span class="text-[10px] font-bold opacity-70">โต๊ะ</span>
+              <span>{{ table }}</span>
+            </button>
+          </div>
+
+          <div class="flex items-center justify-between rounded-xl bg-indigo-50 border border-indigo-100 px-4 py-3">
+            <span class="text-sm font-semibold text-slate-600">โต๊ะที่เลือก</span>
+            <span class="text-base font-extrabold text-indigo-600">
+              {{ pos.selectedTable ? `โต๊ะ ${pos.selectedTable}` : 'ยังไม่ได้เลือก' }}
+            </span>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Payment Modal -->
@@ -415,6 +560,18 @@ const completeOrder = () => {
           <div>
             <h4 class="text-xl font-bold text-slate-800">ชำระเงินสำเร็จ!</h4>
             <p class="text-sm text-slate-500 mt-1">บันทึกรายการคำสั่งซื้อเรียบร้อยแล้ว</p>
+          </div>
+          <div class="p-4 bg-indigo-50 rounded-xl border border-indigo-100 text-left">
+            <div class="flex justify-between text-xs text-slate-500">
+              <span>ประเภทออเดอร์:</span>
+              <span class="font-bold text-slate-800">
+                {{ pos.orderType === 'takeaway' ? 'กลับบ้าน' : 'นั่งที่ร้าน' }}
+              </span>
+            </div>
+            <div v-if="pos.orderType === 'dine-in'" class="flex justify-between text-xs text-slate-500 mt-1">
+              <span>โต๊ะ:</span>
+              <span class="font-bold text-slate-800">{{ pos.selectedTable }}</span>
+            </div>
           </div>
           <div v-if="paymentMethod === 'cash'" class="p-4 bg-slate-50 rounded-xl border border-slate-100 text-left">
             <div class="flex justify-between text-xs text-slate-500">
