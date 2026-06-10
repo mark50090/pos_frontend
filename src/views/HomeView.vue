@@ -32,6 +32,26 @@ const filteredMenu = computed(() => {
 
 // Serving Option Selector
 const selectedOption = ref('normal') // normal (กับข้าว), rad-khao-1 (ราดข้าว 1 อย่าง), rad-khao-2 (ราดข้าว 2 อย่าง)
+const isRicePlateModalOpen = ref(false)
+const ricePlateCount = ref(1)
+const ricePlateSpecial = ref(false)
+const ricePlateCustomPrice = ref(40)
+const ricePlateNote = ref('')
+const selectedRiceToppings = ref([])
+
+const ricePlateMenu = computed(() => {
+  return pos.menuItems.filter(item => !['rice', 'drink'].includes(item.category))
+})
+
+const suggestedRicePlatePrice = computed(() => {
+  const basePrice = ricePlateCount.value === 1 ? 40 : 50
+  const premiumPrice = selectedRiceToppings.value.reduce((highest, item) => {
+    return Math.max(highest, item.ricePlatePrice || 0)
+  }, 0)
+  const specialExtra = ricePlateSpecial.value ? 10 : 0
+
+  return Math.max(basePrice, premiumPrice) + specialExtra
+})
 
 // Payment Modal State
 const isPaymentModalOpen = ref(false)
@@ -44,6 +64,79 @@ const changeAmount = computed(() => {
   const paid = parseFloat(amountPaid.value) || 0
   return Math.max(0, paid - pos.total)
 })
+
+const syncRicePlatePrice = () => {
+  ricePlateCustomPrice.value = suggestedRicePlatePrice.value
+}
+
+const openRicePlateBuilder = (item) => {
+  ricePlateCount.value = selectedOption.value === 'rad-khao-2' ? 2 : 1
+  ricePlateSpecial.value = false
+  ricePlateNote.value = ''
+  selectedRiceToppings.value = [item]
+  syncRicePlatePrice()
+  isRicePlateModalOpen.value = true
+}
+
+const handleMenuSelect = (item) => {
+  if (selectedOption.value === 'normal') {
+    pos.addToCart(item, selectedOption.value)
+    return
+  }
+
+  openRicePlateBuilder(item)
+}
+
+const setRicePlateCount = (count) => {
+  ricePlateCount.value = count
+  selectedRiceToppings.value = selectedRiceToppings.value.slice(0, count)
+  syncRicePlatePrice()
+}
+
+const toggleRicePlateTopping = (item) => {
+  const existingIndex = selectedRiceToppings.value.findIndex(topping => topping.id === item.id)
+
+  if (existingIndex > -1) {
+    selectedRiceToppings.value.splice(existingIndex, 1)
+    syncRicePlatePrice()
+    return
+  }
+
+  if (selectedRiceToppings.value.length >= ricePlateCount.value) {
+    selectedRiceToppings.value.splice(ricePlateCount.value - 1, 1, item)
+  } else {
+    selectedRiceToppings.value.push(item)
+  }
+
+  syncRicePlatePrice()
+}
+
+const toggleRicePlateSpecial = () => {
+  ricePlateSpecial.value = !ricePlateSpecial.value
+  syncRicePlatePrice()
+}
+
+const addRicePlate = () => {
+  if (selectedRiceToppings.value.length === 0) return
+
+  pos.addRicePlateToCart({
+    toppingCount: ricePlateCount.value,
+    toppings: selectedRiceToppings.value,
+    isSpecial: ricePlateSpecial.value,
+    price: Number(ricePlateCustomPrice.value) || suggestedRicePlatePrice.value,
+    note: ricePlateNote.value
+  })
+  isRicePlateModalOpen.value = false
+}
+
+const getCartOptionLabel = (item) => {
+  if (item.option === 'rad-khao-1') return 'ราดข้าว 1'
+  if (item.option === 'rad-khao-2') return 'ราดข้าว 2'
+  if (item.option?.startsWith('rice-plate')) {
+    return item.isSpecial ? `ราดข้าว ${item.toppingCount} อย่าง พิเศษ` : `ราดข้าว ${item.toppingCount} อย่าง`
+  }
+  return ''
+}
 
 const openPayment = () => {
   if (pos.cart.length === 0) return
@@ -189,7 +282,7 @@ const completeOrder = () => {
             <button 
               v-for="item in filteredMenu" 
               :key="item.id"
-              @click="pos.addToCart(item, selectedOption)"
+              @click="handleMenuSelect(item)"
               class="group bg-white rounded-2xl p-4 text-left border border-slate-200/60 shadow-sm hover:shadow-md hover:border-indigo-200 transition-all flex flex-col justify-between h-36 relative overflow-hidden active:scale-95"
             >
               <!-- Decorative colored corner -->
@@ -202,11 +295,14 @@ const completeOrder = () => {
                 <h3 class="font-bold text-slate-800 mt-1 line-clamp-2 text-sm sm:text-base leading-tight group-hover:text-indigo-600 transition-colors">
                   {{ item.name }}
                 </h3>
+                <span v-if="item.isPremium" class="inline-flex mt-2 text-[10px] px-1.5 py-0.5 bg-amber-50 text-amber-700 rounded font-bold">
+                  เมนูพิเศษ
+                </span>
               </div>
               
               <div class="flex justify-between items-baseline z-10 mt-auto">
                 <span class="text-lg font-extrabold text-slate-900">
-                  ฿{{ item.price }}
+                  ฿{{ selectedOption === 'normal' ? item.price : (item.ricePlatePrice || item.price) }}
                 </span>
                 <span class="text-xs text-indigo-600 font-bold opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-0.5">
                   เลือก +
@@ -338,9 +434,10 @@ const completeOrder = () => {
             <div class="flex items-center gap-2 mt-1">
               <span class="text-xs text-slate-400">฿{{ item.price }}</span>
               <span v-if="item.option !== 'normal'" class="text-[10px] px-1.5 py-0.5 bg-indigo-50 text-indigo-600 rounded font-semibold">
-                {{ item.option === 'rad-khao-1' ? 'ราดข้าว 1' : 'ราดข้าว 2' }}
+                {{ getCartOptionLabel(item) }}
               </span>
             </div>
+            <p v-if="item.note" class="text-[10px] text-slate-400 mt-1 truncate">{{ item.note }}</p>
           </div>
           
           <!-- Quantity Controls -->
@@ -403,6 +500,121 @@ const completeOrder = () => {
         </button>
       </div>
     </div>
+    </div>
+
+    <!-- Rice Plate Builder Modal -->
+    <div v-if="isRicePlateModalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+      <div class="bg-white rounded-2xl shadow-2xl border border-slate-100 w-full max-w-2xl max-h-[92vh] overflow-hidden animate-fade-in flex flex-col">
+        <div class="p-4 border-b border-slate-200 flex justify-between items-center bg-slate-50">
+          <div>
+            <h3 class="font-bold text-slate-800 text-lg">จัดจานราดข้าว</h3>
+            <p class="text-xs text-slate-500 mt-0.5">เลือกแกง ปรับพิเศษ และแก้ราคาได้ตามหน้างาน</p>
+          </div>
+          <button @click="isRicePlateModalOpen = false" class="text-slate-400 hover:text-slate-600">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <div class="p-5 space-y-4 overflow-y-auto">
+          <div class="grid grid-cols-2 gap-2">
+            <button
+              v-for="count in [1, 2]"
+              :key="count"
+              @click="setRicePlateCount(count)"
+              :class="[
+                'py-3 rounded-xl border text-sm font-bold transition-all',
+                ricePlateCount === count
+                  ? 'bg-indigo-50 border-indigo-600 text-indigo-600 shadow-sm'
+                  : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+              ]"
+            >
+              ราดข้าว {{ count }} อย่าง
+            </button>
+          </div>
+
+          <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            <button
+              v-for="item in ricePlateMenu"
+              :key="item.id"
+              @click="toggleRicePlateTopping(item)"
+              :class="[
+                'min-h-20 rounded-xl border p-3 text-left transition-all',
+                selectedRiceToppings.some(topping => topping.id === item.id)
+                  ? 'bg-indigo-50 border-indigo-600 shadow-sm'
+                  : 'bg-white border-slate-200 hover:bg-slate-50'
+              ]"
+            >
+              <div class="flex items-start justify-between gap-2">
+                <span class="text-sm font-bold text-slate-800 leading-tight">{{ item.name }}</span>
+                <span v-if="item.isPremium" class="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 font-bold shrink-0">พิเศษ</span>
+              </div>
+              <p class="text-xs text-slate-400 mt-2">
+                ราดข้าว {{ item.ricePlatePrice ? `฿${item.ricePlatePrice}` : 'ราคาปกติ' }}
+              </p>
+            </button>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <button
+              @click="toggleRicePlateSpecial"
+              :class="[
+                'rounded-xl border px-4 py-3 text-left transition-all',
+                ricePlateSpecial
+                  ? 'bg-amber-50 border-amber-500 text-amber-700'
+                  : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+              ]"
+            >
+              <span class="block text-sm font-extrabold">พิเศษ +10</span>
+              <span class="block text-xs mt-0.5">ใช้กับจานที่ลูกค้าขอเพิ่มปริมาณ</span>
+            </button>
+
+            <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+              <div class="flex justify-between text-xs text-slate-500 font-semibold">
+                <span>ราคาแนะนำ</span>
+                <span>฿{{ suggestedRicePlatePrice }}</span>
+              </div>
+              <label class="block text-sm font-extrabold text-slate-800 mt-2">ราคาขายจริง</label>
+              <input
+                v-model.number="ricePlateCustomPrice"
+                type="number"
+                min="0"
+                class="w-full mt-1 px-3 py-2 border border-slate-300 rounded-lg text-right text-lg font-extrabold focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-sm font-semibold text-slate-700">หมายเหตุ</label>
+            <input
+              v-model="ricePlateNote"
+              type="text"
+              placeholder="เช่น ข้าวน้อย, ราดน้ำเยอะ"
+              class="w-full mt-1.5 px-4 py-2.5 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+          </div>
+
+          <div class="rounded-xl bg-indigo-50 border border-indigo-100 px-4 py-3">
+            <div class="flex justify-between gap-3">
+              <span class="text-sm font-semibold text-slate-600">จานนี้</span>
+              <span class="text-sm font-extrabold text-indigo-700 text-right">
+                {{ selectedRiceToppings.map(item => item.name).join(' + ') || 'ยังไม่ได้เลือกแกง' }}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div class="p-4 border-t border-slate-200 bg-white">
+          <button
+            @click="addRicePlate"
+            :disabled="selectedRiceToppings.length === 0"
+            class="w-full py-3 px-4 border border-transparent rounded-xl shadow-lg text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+          >
+            เพิ่มจานนี้ ฿{{ ricePlateCustomPrice || suggestedRicePlatePrice }}
+          </button>
+        </div>
+      </div>
     </div>
 
     <!-- Table Selection Modal -->

@@ -52,10 +52,10 @@ const quickLogin = (role) => {
         </div>
       </div>
       <h2 class="mt-6 text-center text-3xl font-extrabold text-gray-900 tracking-tight">
-        เข้าสู่ระบบ POS System
+        เจ๊หยก POS
       </h2>
       <p class="mt-2 text-center text-sm text-gray-600">
-        ระบบบริหารจัดการ ณ จุดขายอัจฉริยะ
+        ร้านขนมจีนแม่บุญสร้าง - สาขา 1
       </p>
     </div>
 

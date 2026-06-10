@@ -7,10 +7,12 @@ export const usePosStore = defineStore('pos', () => {
     { id: 2, name: 'พะแนงหมู', price: 50, category: 'curry', color: 'from-orange-400 to-red-500' },
     { id: 3, name: 'ไข่พะโล้', price: 45, category: 'curry', color: 'from-amber-500 to-amber-700' },
     { id: 4, name: 'แกงส้มชะอมไข่', price: 55, category: 'curry', color: 'from-yellow-500 to-orange-600' },
+    { id: 16, name: 'ต้มหมึกหวาน', price: 70, ricePlatePrice: 60, isPremium: true, category: 'curry', color: 'from-violet-400 to-fuchsia-600' },
     
     { id: 5, name: 'กะเพราหมูสับ', price: 45, category: 'stir-fry', color: 'from-red-400 to-rose-600' },
     { id: 6, name: 'ผัดผักรวมมิตร', price: 40, category: 'stir-fry', color: 'from-green-400 to-emerald-600' },
     { id: 7, name: 'ผัดเผ็ดปลาดุก', price: 50, category: 'stir-fry', color: 'from-red-500 to-amber-800' },
+    { id: 17, name: 'หมูคั่วเค็ม', price: 65, ricePlatePrice: 60, isPremium: true, category: 'stir-fry', color: 'from-stone-500 to-amber-700' },
     
     { id: 8, name: 'หมูทอดกระเทียม', price: 45, category: 'fried', color: 'from-amber-400 to-amber-600' },
     { id: 9, name: 'ไข่ดาว', price: 10, category: 'fried', color: 'from-yellow-300 to-orange-400' },
@@ -75,6 +77,36 @@ export const usePosStore = defineStore('pos', () => {
         quantity: 1
       })
     }
+  }
+
+  function addRicePlateToCart(plate) {
+    const toppingNames = plate.toppings.map(item => item.name).join(' + ')
+    const displayName = `${plate.isSpecial ? 'ราดข้าวพิเศษ' : 'ราดข้าว'} ${plate.toppingCount} อย่าง (${toppingNames})`
+    const option = `rice-plate-${plate.toppingCount}${plate.isSpecial ? '-special' : ''}`
+    const signature = plate.toppings.map(item => item.id).sort((a, b) => a - b).join('-')
+
+    const existingIndex = cart.value.findIndex(
+      item => item.option === option && item.signature === signature && item.price === plate.price
+    )
+
+    if (existingIndex > -1) {
+      cart.value[existingIndex].quantity++
+      return
+    }
+
+    cart.value.push({
+      id: `rice-plate-${Date.now()}`,
+      displayName,
+      name: displayName,
+      price: plate.price,
+      option,
+      signature,
+      toppingCount: plate.toppingCount,
+      toppings: plate.toppings.map(item => ({ ...item })),
+      isSpecial: plate.isSpecial,
+      note: plate.note,
+      quantity: 1
+    })
   }
 
   function removeFromCart(index) {
@@ -156,6 +188,7 @@ export const usePosStore = defineStore('pos', () => {
     total,
     resetOrder,
     addToCart,
+    addRicePlateToCart,
     removeFromCart,
     updateQuantity,
     clearCart,
